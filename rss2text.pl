@@ -21,7 +21,7 @@ my $recent_pulled = $rss_cache->{w3c}->parse_datetime($feed->get_item(0)->pubDat
 # say each link if it's new
 foreach my $item ( $feed->get_item() ) {
     last if (DateTime->compare($rss_cache->{last_pulled_dt}, $rss_cache->{w3c}->parse_datetime($item->pubDate())) > -1);
-	(my $output = $format_string) =~ s/__([^\s]*?)__/$item->get($1)/ge;
+	(my $output = $format_string) =~ s/__([^\s]*?)__/$item->get($1) ? $item->get($1) : "TAG \"$1\" UNDEFINED"/ge;
 	say $output;
 }
 

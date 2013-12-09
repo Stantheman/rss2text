@@ -31,7 +31,12 @@ entries include:
  * author
 
 You can request anything you'd like if you know that a feed will have the item
-you're requesting.
+you're requesting. If it's not there, you'll get a big pretty message placeholder
+in your output:
+
+		TAG "thing" UNDEFINED
+
+Check your placeholders!
 
 # DEPENDENCIES
 
