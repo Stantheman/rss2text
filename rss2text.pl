@@ -8,6 +8,9 @@ use XML::FeedPP;
 my $url = shift || die "Usage: $0 URL <format string>";
 my $format_string = shift || "__link__";
 
+# expand newlines and tabs using cool double eval
+$format_string =~ s/\\([nt])/"qq|\\$1|"/gee;
+
 # get everything we know about this url
 my $rss_cache = rss2text::cache->new($url);
 $rss_cache->get_cached_rss();
@@ -21,6 +24,7 @@ my $recent_pulled = $rss_cache->{w3c}->parse_datetime($feed->get_item(0)->pubDat
 # say each link if it's new
 foreach my $item ( $feed->get_item() ) {
     last if (DateTime->compare($rss_cache->{last_pulled_dt}, $rss_cache->{w3c}->parse_datetime($item->pubDate())) > -1);
+
 	(my $output = $format_string) =~ s/__([^\s]*?)__/$item->get($1) ? $item->get($1) : "TAG \"$1\" UNDEFINED"/ge;
 	say $output;
 }
@@ -126,17 +130,23 @@ Takes a feed and optional format string, and prints for every new entry.
 rss2text takes a feed and an optional format string, grabs the feed and loops
 over the returned entries, printing what was requested in the format string.
 It's like printf for RSS feeds and is particularly useful for one-liners and
-other places you need a textual interface.
+other places where you need a textual interface.
 
-rss2text assumes a format string of "__link__", which will loop over entries
-and print the URL for each entry.
+rss2text assumes a default format string of "__link__", which will loop over
+entries and print the URL for each entry.
 
 By default, rss2text caches hits to the URL under /tmp/rss2text. If a
-cached file is available, it will read it and only loop over entries newer
-than the last time it ran. This makes rss2text especially useful for cronjobs.
+cached file is available, it will read it and only loop over entries that are
+newer than the last time it ran. This makes rss2text especially useful for cronjobs.
+Specifically, rss2text stores the date of the last entry it saw, along with the
+ETag and Last-Modified header (if seen).
 
-The format string can takes any child elements that belong in an entry. Typical
-entries include "title", "description", "published", "link", and "author".
+The format string can take any child elements that belong in an entry. Typical
+entries include "title", "description", "published", "link", and "author". The
+format string allows you to identify these elements by wrapping them in double
+underscores. Printing the title of every link is achieved by passing in the
+format string as "__title__". If you want to print the title, a colon and a single
+space, and then the link, simply pass "__title__: __link__".
 
 You can request anything you'd like if you know that a feed will have the item
 you're requesting. If it's not there, you'll get a big pretty message placeholder
@@ -165,6 +175,9 @@ say/print-newline dance yourself.
 
 	# print a list of titles from the feed
 	./rss2text.pl http://www.schwertly.com/feed/ "__title__"
+
+	# print the title, a newline, then tab in, then the link
+	./rss2text.pl http://www.schwertly.com/feed/ "__title__\n\t__link__"
 
 =head1 AUTHOR
 
