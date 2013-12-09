@@ -43,7 +43,7 @@ Check your placeholders!
 rss2text is written in perl and uses LWP::UserAgent to grab feeds, XML::FeedPP
 for parsing feeds, and DateTime::Format::W3CDTF to parse dates.
 
-Debian has packages available each:
+Debian has packages available for each of these modules:
 
 		apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl
 
