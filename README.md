@@ -1,6 +1,6 @@
 # rss2text
 
-Takes a feed and optional format string, and prints out useful information
+Takes a feed and optional format string, and prints for every new entry.
 
 # USAGE
 
@@ -11,15 +11,15 @@ Takes a feed and optional format string, and prints out useful information
 
 rss2text takes a feed and an optional format string, grabs the feed and loops
 over the returned entries, printing what was requested in the format string.
-Its like printf for RSS feeds and is particularly useful for one-liners and
+It's like printf for RSS feeds and is particularly useful for one-liners and
 other places you need a textual interface.
 
 rss2text assumes a format string of "__link__", which will loop over entries
 and print the URL for each entry.
 
-By default, rss2text caches hits to the URL under /var/cache/rss2text. If a
+By default, rss2text caches hits to the URL under /tmp/rss2text. If a
 cached file is available, it will read it and only loop over entries newer
-than the last time it ran.
+than the last time it ran. This makes rss2text especially useful for cronjobs.
 
 The format string can takes any child elements that belong in an entry. Typical
 entries include:
