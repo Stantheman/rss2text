@@ -16,7 +16,8 @@ my $recent_pulled = $rss_cache->{w3c}->parse_datetime($feed->get_item(0)->pubDat
 # say each link if it's new
 foreach my $item ( $feed->get_item() ) {
     last if (DateTime->compare($rss_cache->{last_pulled_dt}, $rss_cache->{w3c}->parse_datetime($item->pubDate())) > -1);
-    say $item->link();
+	(my $output = $format_string) =~ s/__([^\s]*?)__/$item->get($1)/ge;
+	say $output;
 }
 
 $rss_cache->update_rss_cache($recent_pulled);
@@ -30,7 +31,7 @@ sub new {
 	my $class = shift;
 
 	my $self->{url}    = shift;
-	$self->{_cache_dir} = '/var/cache/rss2text/';
+	$self->{_cache_dir} = '/tmp/rss2text/';
 	$self->{_cache_filename} = $self->{_cache_dir} . md5_hex($self->{url});
 	$self->{w3c} = DateTime::Format::W3CDTF->new;
 
@@ -41,6 +42,7 @@ sub get_cached_rss {
 	my $self = shift;
 
 	mkdir $self->{_cache_dir}, 0755 unless (-e $self->{_cache_dir});
+	die "Unable to make $self->{_cache_dir}: $!" unless (-e $self->{_cache_dir});
 
 	unless (-e $self->{_cache_filename}) {
 		print STDERR "Cache file for this feed doesn't exist.\n";
