@@ -25,7 +25,7 @@ my $recent_pulled = $rss_cache->{w3c}->parse_datetime($feed->get_item(0)->pubDat
 foreach my $item ( $feed->get_item() ) {
     last if (DateTime->compare($rss_cache->{last_pulled_dt}, $rss_cache->{w3c}->parse_datetime($item->pubDate())) > -1);
 
-	(my $output = $format_string) =~ s/__([^\s]*?)__/$item->get($1) ? $item->get($1) : "TAG \"$1\" UNDEFINED"/ge;
+	(my $output = $format_string) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
 	say $output;
 }
 
@@ -54,6 +54,21 @@ sub get_xml_feed {
 	}
 
 	return XML::FeedPP->new($rss_feed->decoded_content);
+}
+
+sub parse_token {
+	my ($item, $token) = @_;
+
+	# XML::FeedPP will work harder for us if we use their convenience functions instead of get
+	if ($item->can($token)) {
+		return $item->$token();
+	}
+	# otherwise, try to get
+	my $token_val = $item->get($token);
+	unless ($token_val) {
+		return "TAG \"$token\" UNDEFINED";
+	}
+	return $token_val;
 }
 
 ### Cache class ###
