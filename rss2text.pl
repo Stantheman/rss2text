@@ -7,24 +7,11 @@ use LWP::UserAgent;
 use Pod::Usage;
 use XML::FeedPP;
 
-my %opts = (
-	format => '__link__',
-	cache  => 1,
-	cache_dir => '/tmp/rss2text/',
-);
-GetOptions(\%opts,
-	'format|f:s',
-	'cache|c!',
-	'cache_dir:s',
-) or pod2usage(2);
-
-my $url = shift or pod2usage(2);
-
-# expand newlines and tabs using cool double eval
-$opts{format} =~ s/\\([nt])/"qq|\\$1|"/gee;
+# get options passed in
+my ($opts, $url) = get_options();
 
 # get everything we know about this url
-my $rss_cache = rss2text::cache->new($url, $opts{cache}, $opts{cache_dir});
+my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
 $rss_cache->get_cached_rss();
 
 # get everything the internet knows about this url
@@ -35,13 +22,38 @@ my $recent_pulled = $rss_cache->{w3c}->parse_datetime($feed->get_item(0)->pubDat
 
 # say each link if it's new
 foreach my $item ( $feed->get_item() ) {
-    last if (DateTime->compare($rss_cache->{last_pulled_dt}, $rss_cache->{w3c}->parse_datetime($item->pubDate())) > -1);
+	last if ($rss_cache->is_cached_newer($item->pubDate()));
 
-	(my $output = $opts{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
+	(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
 	say $output;
 }
 
 $rss_cache->update_rss_cache($recent_pulled);
+
+sub get_options {
+	# default settings
+	my %opts = (
+		format    => '__link__',
+		cache     => 1,
+		cache_dir => '/tmp/rss2text/',
+	);
+
+	GetOptions(\%opts,
+		'format|f:s',
+		'cache|c!',
+		'cache_dir:s',
+	) or pod2usage(2);
+
+	my $url = shift @ARGV or pod2usage(2);
+
+	# expand newlines and tabs using cool double eval
+	$opts{format} =~ s/\\([nt])/"qq|\\$1|"/gee;
+
+	# add a trailing slash if they forgot
+	$opts{cache_dir} =~ s|([^/])$|$1/|;
+
+	return (\%opts, $url);
+}
 
 sub get_xml_feed {
 	my ($url, $rss_cache) = @_;
@@ -89,13 +101,11 @@ use DateTime::Format::W3CDTF;
 use Digest::MD5 'md5_hex';
 
 sub new {
-	my ($class, $cache_on, $cache_dir) = @_;
+	my ($class, $url, $cache_on, $cache_dir) = @_;
 
-	my $self->{url}      = shift;
-	my $self->{cache_on} = $cache_on;
+	my $self->{url}   = shift;
+	$self->{_cache_on} = $cache_on;
 	
-	return bless $self, $class unless $cache_on;
-
 	$self->{_cache_dir} = $cache_dir;
 	$self->{_cache_filename} = $self->{_cache_dir} . md5_hex($self->{url});
 	$self->{w3c} = DateTime::Format::W3CDTF->new;
@@ -110,7 +120,7 @@ sub new {
 sub get_cached_rss {
 	my $self = shift;
 
-	return unless $self->{cache_on};
+	return unless $self->{_cache_on};
 
 	mkdir $self->{_cache_dir}, 0755 unless (-e $self->{_cache_dir});
 	die "Unable to make $self->{_cache_dir}: $!" unless (-e $self->{_cache_dir});
@@ -134,10 +144,18 @@ sub get_cached_rss {
 	return $self->{last_pulled_dt};
 }
 
+sub is_cached_newer {
+	my ($self, $compare_dt) = @_;
+
+	return unless $self->{_cache_on};
+
+	return (DateTime->compare($self->{last_pulled_dt}, $self->{w3c}->parse_datetime($compare_dt)) >= 0);
+}
+
 sub update_rss_cache {
 	my ($self, $new_dt) = @_;
 
-	return unless $self->{cache_on};
+	return unless $self->{_cache_on};
 
 	# if the last_pulled_dt < $new_dt
 	if (DateTime->compare($self->{last_pulled_dt}, $new_dt) == -1) {
@@ -158,16 +176,54 @@ Takes a feed and optional format string, and prints for every new entry.
 =head1 USAGE
 
 	./rss2text.pl URL
-	./rss2text.pl URL "__title__: __link__"
+	./rss2text.pl --format "__title__: __link__" URL
 
 =head1 SYNOPSIS
 
-./rss2text [options] URL
+	./rss2text [options] URL
 
-  Options:
-    -f, --format	template string for returning results
-    -[no]c, --[no]cache	enables/disables cache.
-    --cache-dir	location of the cache directory.
+	Options:
+	  -f, --format          template string for returning results.
+	  -[no]c, --[no]cache   enables/disables cache.
+	  --cache-dir           location of the cache directory.
+
+=head1 OPTIONS
+
+=item B<-f> I<format string>, B<--format>=I<format string>
+
+The format string dictates how rss2text returns your data. It can include any
+static text you'd like along with placeholders, which use double underscores
+to separate themselves. A placeholder looks like __name__ and will be substituted
+with the child element of the feed entry. 
+
+The format string can take any child elements that belong in an entry. Typical
+placeholders include "title", "description", "published", "link", and "author".
+Printing the title of every link is achieved by passing in the format string as
+"__title__". If you want to print the title, a colon and a single
+space, and then the link, simply pass "__title__: __link__".
+
+You can request anything you'd like if you know that a feed will have the item
+you're requesting. If it's not there, you'll get a big pretty message placeholder
+in your output:
+
+    TAG "thing" UNDEFINED
+
+The default value is "__link__".
+
+=item B<-[no]c>, B<--[no]cache>
+
+The cache option enables or disables the cache. rss2text caches the date of the
+latest entry it last saw, along with any HTTP caching headers it saw (ETag and 
+Last-Modified values).
+
+The default value is to cache.
+
+=item B<--cache-dir>
+
+This options specifies the directory in which to store cached information. This
+option does nothing if caching is disabled.
+
+The default location for the cache is under /tmp/rss2text
 
 =head1 DESCRIPTION
 
@@ -176,29 +232,9 @@ over the returned entries, printing what was requested in the format string.
 It's like printf for RSS feeds and is particularly useful for one-liners and
 other places where you need a textual interface.
 
-rss2text assumes a default format string of "__link__", which will loop over
-entries and print the URL for each entry.
-
-By default, rss2text caches hits to the URL under /tmp/rss2text. If a
-cached file is available, it will read it and only loop over entries that are
-newer than the last time it ran. This makes rss2text especially useful for cronjobs.
-Specifically, rss2text stores the date of the last entry it saw, along with the
-ETag and Last-Modified header (if seen).
-
-The format string can take any child elements that belong in an entry. Typical
-entries include "title", "description", "published", "link", and "author". The
-format string allows you to identify these elements by wrapping them in double
-underscores. Printing the title of every link is achieved by passing in the
-format string as "__title__". If you want to print the title, a colon and a single
-space, and then the link, simply pass "__title__: __link__".
-
-You can request anything you'd like if you know that a feed will have the item
-you're requesting. If it's not there, you'll get a big pretty message placeholder
-in your output:
-
-	TAG "thing" UNDEFINED
-
-Check your placeholders!
+rss2text will, by default, try to cache as much information as possible in order to
+prevent displaying entries that were seen on a previous run. This makes rss2text
+especially useful for cronjobs.
 
 =head1 DEPENDENCIES
 
@@ -217,11 +253,11 @@ say/print-newline dance yourself.
 	# print a list of new links from the feed
 	./rss2text.pl http://www.schwertly.com/feed/
 
-	# print a list of titles from the feed
-	./rss2text.pl http://www.schwertly.com/feed/ "__title__"
+	# print a list of titles from the feed without using the cache
+	./rss2text.pl --nocache -f "__title__" http://www.schwertly.com/feed/
 
 	# print the title, a newline, then tab in, then the link
-	./rss2text.pl http://www.schwertly.com/feed/ "__title__\n\t__link__"
+	./rss2text.pl -f "__title__\n\t__link__" http://www.schwertly.com/feed/
 
 =head1 AUTHOR
 
