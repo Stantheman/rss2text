@@ -2,17 +2,29 @@
 use strict;
 use warnings;
 use 5.10.0;
+use Getopt::Long qw(:config auto_help);
 use LWP::UserAgent;
+use Pod::Usage;
 use XML::FeedPP;
 
-my $url = shift || die "Usage: $0 URL <format string>";
-my $format_string = shift || "__link__";
+my %opts = (
+	format => '__link__',
+	cache  => 1,
+	cache_dir => '/tmp/rss2text/',
+);
+GetOptions(\%opts,
+	'format|f:s',
+	'cache|c!',
+	'cache_dir:s',
+) or pod2usage(2);
+
+my $url = shift or pod2usage(2);
 
 # expand newlines and tabs using cool double eval
-$format_string =~ s/\\([nt])/"qq|\\$1|"/gee;
+$opts{format} =~ s/\\([nt])/"qq|\\$1|"/gee;
 
 # get everything we know about this url
-my $rss_cache = rss2text::cache->new($url);
+my $rss_cache = rss2text::cache->new($url, $opts{cache}, $opts{cache_dir});
 $rss_cache->get_cached_rss();
 
 # get everything the internet knows about this url
@@ -25,7 +37,7 @@ my $recent_pulled = $rss_cache->{w3c}->parse_datetime($feed->get_item(0)->pubDat
 foreach my $item ( $feed->get_item() ) {
     last if (DateTime->compare($rss_cache->{last_pulled_dt}, $rss_cache->{w3c}->parse_datetime($item->pubDate())) > -1);
 
-	(my $output = $format_string) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
+	(my $output = $opts{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
 	say $output;
 }
 
@@ -77,10 +89,14 @@ use DateTime::Format::W3CDTF;
 use Digest::MD5 'md5_hex';
 
 sub new {
-	my $class = shift;
+	my ($class, $cache_on, $cache_dir) = @_;
 
-	my $self->{url}    = shift;
-	$self->{_cache_dir} = '/tmp/rss2text/';
+	my $self->{url}      = shift;
+	my $self->{cache_on} = $cache_on;
+	
+	return bless $self, $class unless $cache_on;
+
+	$self->{_cache_dir} = $cache_dir;
 	$self->{_cache_filename} = $self->{_cache_dir} . md5_hex($self->{url});
 	$self->{w3c} = DateTime::Format::W3CDTF->new;
 
@@ -93,6 +109,8 @@ sub new {
 
 sub get_cached_rss {
 	my $self = shift;
+
+	return unless $self->{cache_on};
 
 	mkdir $self->{_cache_dir}, 0755 unless (-e $self->{_cache_dir});
 	die "Unable to make $self->{_cache_dir}: $!" unless (-e $self->{_cache_dir});
@@ -119,6 +137,8 @@ sub get_cached_rss {
 sub update_rss_cache {
 	my ($self, $new_dt) = @_;
 
+	return unless $self->{cache_on};
+
 	# if the last_pulled_dt < $new_dt
 	if (DateTime->compare($self->{last_pulled_dt}, $new_dt) == -1) {
 		open my $fh, '>', $self->{_cache_filename} or die "Unable to update the cache file: $!";
@@ -139,6 +159,15 @@ Takes a feed and optional format string, and prints for every new entry.
 
 	./rss2text.pl URL
 	./rss2text.pl URL "__title__: __link__"
+
+=head1 SYNOPSIS
+
+./rss2text [options] URL
+
+  Options:
+    -f, --format	template string for returning results
+    -[no]c, --[no]cache	enables/disables cache.
+    --cache-dir	location of the cache directory.
 
 =head1 DESCRIPTION
 
