@@ -57,7 +57,9 @@ sub get_options {
 
 sub get_xml_feed {
 	my ($url, $rss_cache) = @_;
-	my $ua = LWP::UserAgent->new();
+	my $ua = LWP::UserAgent->new(
+		agent => 'rss2text (https://github.com/Stantheman/rss2text)',
+	);
 
 	# add caching headers if they exist
 	if (length($rss_cache->{etag})) {
