@@ -101,6 +101,7 @@ sub parse_token {
 package rss2text::cache;
 use DateTime::Format::W3CDTF;
 use Digest::MD5 'md5_hex';
+use Try::Tiny;
 
 sub new {
 	my ($class, $url, $cache_on, $cache_dir) = @_;
@@ -135,12 +136,22 @@ sub get_cached_rss {
 	}
 
 	open my $fh, '<', $self->{_cache_filename} or die "Can't read the cached information for this RSS feed: $!";
-	my $last_pulled_dt = <$fh>;
+	chomp(my $last_pulled_dt = <$fh>);
 	unless ($last_pulled_dt) {
 		print STDERR "Cache file for this feed is empty, starting from 0\n";
 		return;
 	}
-	$self->{last_pulled_dt} = $self->{w3c}->parse_datetime($last_pulled_dt);
+
+	# parse_datetime might die
+	try {
+		$last_pulled_dt = $self->{w3c}->parse_datetime($last_pulled_dt);
+	} catch {
+		print STDERR "Cached pull date isn't valid: $last_pulled_dt. Using 0\n";
+		$last_pulled_dt = $self->{last_pulled_dt};
+	};
+
+	$self->{last_pulled_dt} = $last_pulled_dt;
+
 	chomp($self->{etag} = <$fh>);
 	chomp($self->{last_modified} = <$fh>);
 	return $self->{last_pulled_dt};
@@ -241,11 +252,12 @@ especially useful for cronjobs.
 =head1 DEPENDENCIES
 
 rss2text is written in perl and uses LWP::UserAgent to grab feeds, XML::FeedPP
-for parsing feeds, and DateTime::Format::W3CDTF to parse dates.
+for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
+make sure DateTime::Format::W3CDTF doesn't kill the program.
 
 Debian has packages available each:
 
-	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl
+	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl
 
 rss2text uses perl 5.10.0. Older perls can be used, but you'll have to do the
 say/print-newline dance yourself.

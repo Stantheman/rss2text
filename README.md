@@ -68,11 +68,12 @@ especially useful for cronjobs.
 # DEPENDENCIES
 
 rss2text is written in perl and uses LWP::UserAgent to grab feeds, XML::FeedPP
-for parsing feeds, and DateTime::Format::W3CDTF to parse dates.
+for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
+make sure DateTime::Format::W3CDTF doesn't kill the program.
 
 Debian has packages available each:
 
-	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl
+	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl
 
 rss2text uses perl 5.10.0. Older perls can be used, but you'll have to do the
 say/print-newline dance yourself.
