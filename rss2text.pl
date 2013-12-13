@@ -110,7 +110,7 @@ sub new {
 	$self->{_cache_on} = $cache_on;
 	
 	$self->{_cache_dir} = $cache_dir;
-	$self->{_cache_filename} = $self->{_cache_dir} . md5_hex($self->{url});
+	$self->{_cache_filename} = $self->{_cache_dir} . md5_hex($< . $self->{url});
 	$self->{w3c} = DateTime::Format::W3CDTF->new;
 
 	$self->{etag} = '';
