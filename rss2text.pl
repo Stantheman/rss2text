@@ -119,7 +119,7 @@ use Try::Tiny;
 sub new {
 	my ($class, $url, $cache_on, $cache_dir) = @_;
 
-	my $self->{url}   = shift;
+	my $self->{url}   = $url;
 	$self->{_cache_on} = $cache_on;
 	
 	$self->{_cache_dir} = $cache_dir;
