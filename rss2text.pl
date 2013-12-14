@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use 5.10.0;
 use Getopt::Long qw(:config auto_help);
+use HTTP::Cookies::Netscape;
 use LWP::UserAgent;
 use Pod::Usage;
 use Try::Tiny;
@@ -19,7 +20,7 @@ my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
 $rss_cache->get_cached_rss();
 
 # get everything the internet knows about this url
-my $feed = get_xml_feed($url, $rss_cache);
+my $feed = get_xml_feed($url, $rss_cache, $opts->{cookie_path});
 
 # say each link if it's new
 foreach my $item ( $feed->get_item() ) {
@@ -38,12 +39,14 @@ sub get_options {
 		format    => '__link__',
 		cache     => 1,
 		cache_dir => '/tmp/rss2text/',
+		cookie_path => undef,
 	);
 
 	GetOptions(\%opts,
 		'format|f:s',
 		'cache|c!',
 		'cache_dir:s',
+		'cookie_path:s',
 	) or pod2usage(2);
 
 	my $url = shift @ARGV or pod2usage(2);
@@ -54,15 +57,28 @@ sub get_options {
 	# add a trailing slash if they forgot
 	$opts{cache_dir} =~ s|([^/])$|$1/|;
 
+	unless ( -r $opts{cookie_path} || !defined($opts{cookie_path}) ) {
+		say STDERR "Cookie path $opts{cookie_path} isn't readable, bailing";
+		exit 1;
+	}
+
 	return (\%opts, $url);
 }
 
 sub get_xml_feed {
-	my ($url, $rss_cache) = @_;
+	my ($url, $rss_cache, $cookie_path) = @_;
 	my $ua = LWP::UserAgent->new(
 		agent   => 'rss2text (https://github.com/Stantheman/rss2text)',
 		timeout => 5,
 	);
+
+	if ($cookie_path) {
+		$ua->cookie_jar(
+			HTTP::Cookies::Netscape->new(
+				file => $cookie_path
+			)
+		);
+	}
 
 	# add caching headers if they exist
 	if (length($rss_cache->{etag})) {
@@ -281,12 +297,20 @@ Last-Modified values).
 
 The default value is to cache.
 
-=item B<--cache-dir>
+=item B<--cache_dir>
 
-This options specifies the directory in which to store cached information. This
+This option specifies the directory in which to store cached information. This
 option does nothing if caching is disabled.
 
 The default location for the cache is under /tmp/rss2text
+
+=item B<--cookie_path>
+
+Specifies the location of a cookie to be sent along with the request. The cookie
+must be saved in Netscape format (or more usefully: the format that "curl"
+saves cookies in.
+
+rss2text by default does not send any cookie along with requests.
 
 =head1 DESCRIPTION
 
@@ -305,9 +329,9 @@ rss2text is written in perl and uses LWP::UserAgent to grab feeds, XML::FeedPP
 for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
 make sure DateTime::Format::W3CDTF doesn't kill the program.
 
-Debian has packages available each:
+Debian has packages available for each:
 
-	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl
+	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl libhttp-cookies-perl
 
 rss2text uses perl 5.10.0. Older perls can be used, but you'll have to do the
 say/print-newline dance yourself.

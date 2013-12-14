@@ -47,12 +47,20 @@ Last-Modified values).
 
 The default value is to cache.
 
-- __\--cache-dir__
+- __\--cache\_dir__
 
-This options specifies the directory in which to store cached information. This
+This option specifies the directory in which to store cached information. This
 option does nothing if caching is disabled.
 
 The default location for the cache is under /tmp/rss2text
+
+- __\--cookie\_path__
+
+Specifies the location of a cookie to be sent along with the request. The cookie
+must be saved in Netscape format (or more usefully: the format that "curl"
+saves cookies in.
+
+rss2text by default does not send any cookie along with requests.
 
 # DESCRIPTION
 
@@ -71,9 +79,9 @@ rss2text is written in perl and uses LWP::UserAgent to grab feeds, XML::FeedPP
 for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
 make sure DateTime::Format::W3CDTF doesn't kill the program.
 
-Debian has packages available each:
+Debian has packages available for each:
 
-	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl
+	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl libhttp-cookies-perl
 
 rss2text uses perl 5.10.0. Older perls can be used, but you'll have to do the
 say/print-newline dance yourself.
