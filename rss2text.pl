@@ -57,7 +57,8 @@ sub get_options {
 	# add a trailing slash if they forgot
 	$opts{cache_dir} =~ s|([^/])$|$1/|;
 
-	unless ( -r $opts{cookie_path} || !defined($opts{cookie_path}) ) {
+	# unless it's defined and readable (or the option wasn't used), bail
+	unless ( (defined $opts{cookie_path} && -r $opts{cookie_path}) || !defined($opts{cookie_path}) ) {
 		say STDERR "Cookie path $opts{cookie_path} isn't readable, bailing";
 		exit 1;
 	}
@@ -264,7 +265,8 @@ Takes a feed and optional format string, and prints for every new entry.
 	Options:
 	  -f, --format          template string for returning results.
 	  -[no]c, --[no]cache   enables/disables cache.
-	  --cache-dir           location of the cache directory.
+	  --cache_dir           location of the cache directory.
+	  --cookie_path         path to a cookie to send with the request
 
 =head1 OPTIONS
 

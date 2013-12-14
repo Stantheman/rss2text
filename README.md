@@ -14,7 +14,8 @@ Takes a feed and optional format string, and prints for every new entry.
 	Options:
 	  -f, --format          template string for returning results.
 	  -[no]c, --[no]cache   enables/disables cache.
-	  --cache-dir           location of the cache directory.
+	  --cache_dir           location of the cache directory.
+	  --cookie_path         path to a cookie to send with the request
 
 # OPTIONS
 
