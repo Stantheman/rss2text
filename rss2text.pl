@@ -329,7 +329,8 @@ especially useful for cronjobs.
 
 rss2text is written in perl and uses LWP::UserAgent to grab feeds, XML::FeedPP
 for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
-make sure DateTime::Format::W3CDTF doesn't kill the program.
+make sure DateTime::Format::W3CDTF doesn't kill the program. It will make
+use of HTTP::Cookies::Netscape if you ask it to send a cookie with a request.
 
 Debian has packages available for each:
 
