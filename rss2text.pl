@@ -8,6 +8,9 @@ use Pod::Usage;
 use Try::Tiny;
 use XML::FeedPP;
 
+binmode(STDOUT, ':encoding(UTF-8)');
+binmode(STDERR, ':encoding(UTF-8)');
+
 # get options passed in
 my ($opts, $url) = get_options();
 
@@ -84,7 +87,7 @@ sub get_xml_feed {
 	try {
 		$feed = XML::FeedPP->new($rss_feed->decoded_content);
 	} catch {
-		print STDERR "$url is not in valid RSS format: $_";
+		print STDERR "$url is not in valid RSS format: ", $_;
 		exit 1;
 	};
 
