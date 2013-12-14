@@ -98,7 +98,7 @@ sub parse_token {
 
 	# XML::FeedPP will work harder for us if we use their convenience functions instead of get
 	if ($item->can($token)) {
-		return $item->$token();
+		return $item->$token() // "TAG \"$token\" UNDEFINED";
 	}
 	# otherwise, try to get
 	my $token_val = $item->get($token);
