@@ -310,7 +310,7 @@ The default location for the cache is under /tmp/rss2text
 
 Specifies the location of a cookie to be sent along with the request. The cookie
 must be saved in Netscape format (or more usefully: the format that "curl"
-saves cookies in.
+saves cookies in.)
 
 rss2text by default does not send any cookie along with requests.
 
