@@ -79,7 +79,7 @@ sub get_xml_feed {
 	exit 0 if ($rss_feed->code() == 304);
 
 	if ($rss_feed->is_error()) {
-		print STDERR "$url returned " . $rss_feed->code() . "bailing\n";
+		print STDERR "$url returned " . $rss_feed->code() . ". Bailing\n";
 		exit 1;
 	}
 
