@@ -5,6 +5,7 @@ use 5.10.0;
 use Getopt::Long qw(:config auto_help);
 use LWP::UserAgent;
 use Pod::Usage;
+use Try::Tiny;
 use XML::FeedPP;
 
 # get options passed in
@@ -79,7 +80,15 @@ sub get_xml_feed {
 		exit 1;
 	}
 
-	return XML::FeedPP->new($rss_feed->decoded_content);
+	my $feed;
+	try {
+		$feed = XML::FeedPP->new($rss_feed->decoded_content);
+	} catch {
+		print STDERR "$url is not in valid RSS format: $_";
+		exit 1;
+	};
+
+	return $feed;
 }
 
 sub parse_token {
