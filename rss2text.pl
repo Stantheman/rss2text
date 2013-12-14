@@ -21,18 +21,16 @@ $rss_cache->get_cached_rss();
 # get everything the internet knows about this url
 my $feed = get_xml_feed($url, $rss_cache);
 
-# get the date of the newest entry
-my $recent_pulled = $rss_cache->{w3c}->parse_datetime($feed->get_item(0)->pubDate());
-
 # say each link if it's new
 foreach my $item ( $feed->get_item() ) {
-	last if ($rss_cache->is_cached_newer($item->pubDate()));
+	last if ($rss_cache->is_cached_newer($item->pubDate() // $item->get('pubDate')));
 
 	(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
 	say $output;
 }
 
-$rss_cache->update_rss_cache($recent_pulled);
+# update the cache with information about the feed
+$rss_cache->update_rss_cache($feed);
 
 sub get_options {
 	# default settings
@@ -149,11 +147,12 @@ sub get_cached_rss {
 	}
 
 	open my $fh, '<', $self->{_cache_filename} or die "Can't read the cached information for this RSS feed: $!";
-	chomp(my $last_pulled_dt = <$fh>);
+	my $last_pulled_dt = <$fh>;
 	unless ($last_pulled_dt) {
 		print STDERR "Cache file for this feed is empty, starting from 0\n";
 		return;
 	}
+	chomp($last_pulled_dt);
 
 	# parse_datetime might die
 	try {
@@ -175,13 +174,52 @@ sub is_cached_newer {
 
 	return unless $self->{_cache_on};
 
-	return (DateTime->compare($self->{last_pulled_dt}, $self->{w3c}->parse_datetime($compare_dt)) >= 0);
+	state $already_told_you = 0;
+	unless ($compare_dt) {
+		print STDERR "Can't find a date to compare to, cache is useless this run\n" unless ($already_told_you);
+		$already_told_you = 1;
+		return;
+	}
+
+	my $parsed_compare_dt;
+	try {
+		$parsed_compare_dt = $self->{w3c}->parse_datetime($compare_dt);
+	} catch {
+		unless ($already_told_you) {
+			print STDERR "$compare_dt isn't in W3CDTF format, can't compare to cache. Assuming it's new\n";
+			print STDERR "Run rss2text without caching if this always happens with this URL\n";
+		}
+		$already_told_you = 1;
+	};
+
+	return unless $parsed_compare_dt;
+	return (DateTime->compare($self->{last_pulled_dt}, $parsed_compare_dt) >= 0);
 }
 
 sub update_rss_cache {
-	my ($self, $new_dt) = @_;
+	my ($self, $feed) = @_;
 
 	return unless $self->{_cache_on};
+
+	my $item = $feed->get_item(0) or do {
+		print STDERR "Can't get the first item from the feed. The cache won't be very useful\n";
+		print STDERR "Not updating the cache.\n";
+		exit 1;
+	};
+
+	my $new_dt = $item->pubDate() || $item->get('pubDate');
+
+	unless(defined($new_dt)) {
+		print STDERR "Can't get the published date from the first item in the feed. Not updating the cache\n";
+		exit 1;
+	}
+
+	try {
+		$new_dt = $self->{w3c}->parse_datetime($new_dt);
+	} catch {
+		print STDERR "$new_dt isn't in W3CDTF format, not saving to cache\n";
+		exit 1;
+	};
 
 	# if the last_pulled_dt < $new_dt
 	if (DateTime->compare($self->{last_pulled_dt}, $new_dt) == -1) {
