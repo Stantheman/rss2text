@@ -78,7 +78,7 @@ sub get_xml_feed {
 	exit 0 if ($rss_feed->code() == 304);
 
 	if ($rss_feed->is_error()) {
-		print STDERR "$url returned " . $rss_feed->code() . ". Bailing\n";
+		say STDERR "$url returned " . $rss_feed->code() . ". Bailing";
 		exit 1;
 	}
 
@@ -86,7 +86,7 @@ sub get_xml_feed {
 	try {
 		$feed = XML::FeedPP->new($rss_feed->decoded_content);
 	} catch {
-		print STDERR "$url is not in valid RSS format: ", $_;
+		say STDERR "$url is not in valid RSS format: ", $_;
 		exit 1;
 	};
 
@@ -140,8 +140,8 @@ sub get_cached_rss {
 	die "Unable to make $self->{_cache_dir}: $!" unless (-e $self->{_cache_dir});
 
 	unless (-e $self->{_cache_filename}) {
-		print STDERR "Cache file for this feed doesn't exist.\n";
-		print STDERR "Creating a new cache file and fetching from the beginning\n";
+		say STDERR "Cache file for this feed doesn't exist.";
+		say STDERR "Creating a new cache file and fetching from the beginning";
 		open my $fh, '>', $self->{_cache_filename} or die "Can't create new cache file for this RSS feed: $!";
 		return;
 	}
@@ -149,7 +149,7 @@ sub get_cached_rss {
 	open my $fh, '<', $self->{_cache_filename} or die "Can't read the cached information for this RSS feed: $!";
 	my $last_pulled_dt = <$fh>;
 	unless ($last_pulled_dt) {
-		print STDERR "Cache file for this feed is empty, starting from 0\n";
+		say STDERR "Cache file for this feed is empty, starting from 0";
 		return;
 	}
 	chomp($last_pulled_dt);
@@ -158,7 +158,7 @@ sub get_cached_rss {
 	try {
 		$last_pulled_dt = $self->{w3c}->parse_datetime($last_pulled_dt);
 	} catch {
-		print STDERR "Cached pull date isn't valid: $last_pulled_dt. Using 0\n";
+		say STDERR "Cached pull date isn't valid: $last_pulled_dt. Using 0";
 		$last_pulled_dt = $self->{last_pulled_dt};
 	};
 
@@ -176,7 +176,7 @@ sub is_cached_newer {
 
 	state $already_told_you = 0;
 	unless ($compare_dt) {
-		print STDERR "Can't find a date to compare to, cache is useless this run\n" unless ($already_told_you);
+		say STDERR "Can't find a date to compare to, cache is useless this run" unless ($already_told_you);
 		$already_told_you = 1;
 		return;
 	}
@@ -186,8 +186,8 @@ sub is_cached_newer {
 		$parsed_compare_dt = $self->{w3c}->parse_datetime($compare_dt);
 	} catch {
 		unless ($already_told_you) {
-			print STDERR "$compare_dt isn't in W3CDTF format, can't compare to cache. Assuming it's new\n";
-			print STDERR "Run rss2text without caching if this always happens with this URL\n";
+			say STDERR "$compare_dt isn't in W3CDTF format, can't compare to cache. Assuming it's new";
+			say STDERR "Run rss2text without caching if this always happens with this URL";
 		}
 		$already_told_you = 1;
 	};
@@ -202,22 +202,21 @@ sub update_rss_cache {
 	return unless $self->{_cache_on};
 
 	my $item = $feed->get_item(0) or do {
-		print STDERR "Can't get the first item from the feed. The cache won't be very useful\n";
-		print STDERR "Not updating the cache.\n";
+		say STDERR "Can't get the first item from the feed. Not updating the cache";
 		exit 1;
 	};
 
 	my $new_dt = $item->pubDate() || $item->get('pubDate');
 
 	unless(defined($new_dt)) {
-		print STDERR "Can't get the published date from the first item in the feed. Not updating the cache\n";
+		say STDERR "Can't get the published date from the first item in the feed. Not updating the cache";
 		exit 1;
 	}
 
 	try {
 		$new_dt = $self->{w3c}->parse_datetime($new_dt);
 	} catch {
-		print STDERR "$new_dt isn't in W3CDTF format, not saving to cache\n";
+		say STDERR "$new_dt isn't in W3CDTF format, not saving to cache";
 		exit 1;
 	};
 
