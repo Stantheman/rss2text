@@ -14,6 +14,7 @@ Takes a feed and optional format string, and prints for every new entry.
 	Options:
 	  -f, --format          template string for returning results.
 	  -[no]c, --[no]cache   enables/disables cache.
+	  -i, --input           pass a file of URLs to download or "-" for STDIN
 	  --cache_dir           location of the cache directory.
 	  --cookie_path         path to a cookie to send with the request
 
@@ -47,6 +48,14 @@ latest entry it last saw, along with any HTTP caching headers it saw (ETag and
 Last-Modified values).
 
 The default value is to cache.
+
+- __\-i__ _filename_, __\--input__=_filename_
+
+The location of a file that contains a newline-separated list of URLs to pull.
+The filename can also be "-", in which case STDIN will be used to read URLs.
+You don't have to pass a URL on the command line if you use this option. If you
+do, those URLs will be appeneded to the list. This functionality is mimicked
+from wget.
 
 - __\--cache\_dir__
 
@@ -98,6 +107,9 @@ say/print-newline dance yourself.
 
 	# print the title, a newline, then tab in, then the link
 	./rss2text.pl -f "__title__\n\t__link__" http://www.schwertly.com/feed/
+
+	# pull updates for all of your blogs with perl in the URL
+	grep -i perl urls.txt | ./rss2text.pl -i -
 
 # AUTHOR
 

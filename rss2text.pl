@@ -26,6 +26,7 @@ sub process_url {
 
 	# get everything the internet knows about this url
 	my $feed = get_xml_feed($url, $rss_cache, $opts->{cookie_path});
+	return unless $feed;
 
 	# say each link if it's new
 	foreach my $item ( $feed->get_item() ) {
@@ -70,7 +71,7 @@ sub get_options {
 		} else {
 			unless (-r $input) {
 				say STDERR "$input is not a readable file, bailing";
-				exit;
+				exit 1;
 			}
 			open my $fh, '<', $input or die "Unable to read $input, bailing. Reason: $!";
 			while (defined(my $line = <$fh>)) {
@@ -123,11 +124,11 @@ sub get_xml_feed {
 	my $rss_feed = $ua->get($url);
 
 	# nothing to do if it hasn't been modified
-	exit 0 if ($rss_feed->code() == 304);
+	return if ($rss_feed->code() == 304);
 
 	if ($rss_feed->is_error()) {
 		say STDERR "$url returned " . $rss_feed->code() . ". Bailing";
-		exit 1;
+		return;
 	}
 
 	my $feed;
@@ -135,7 +136,7 @@ sub get_xml_feed {
 		$feed = XML::FeedPP->new($rss_feed->decoded_content);
 	} catch {
 		say STDERR "$url is not in valid RSS format: ", $_;
-		exit 1;
+		$feed = undef;
 	};
 
 	return $feed;
@@ -251,22 +252,23 @@ sub update_rss_cache {
 
 	my $item = $feed->get_item(0) or do {
 		say STDERR "Can't get the first item from the feed. Not updating the cache";
-		exit 1;
+		return;
 	};
 
 	my $new_dt = $item->pubDate() || $item->get('pubDate');
 
 	unless(defined($new_dt)) {
 		say STDERR "Can't get the published date from the first item in the feed. Not updating the cache";
-		exit 1;
+		return;
 	}
 
 	try {
 		$new_dt = $self->{w3c}->parse_datetime($new_dt);
 	} catch {
 		say STDERR "$new_dt isn't in W3CDTF format, not saving to cache";
-		exit 1;
+		$new_dt = undef;
 	};
+	return unless $new_dt;
 
 	# if the last_pulled_dt < $new_dt
 	if (DateTime->compare($self->{last_pulled_dt}, $new_dt) == -1) {
@@ -296,6 +298,7 @@ Takes a feed and optional format string, and prints for every new entry.
 	Options:
 	  -f, --format          template string for returning results.
 	  -[no]c, --[no]cache   enables/disables cache.
+	  -i, --input           pass a file of URLs to download or "-" for STDIN
 	  --cache_dir           location of the cache directory.
 	  --cookie_path         path to a cookie to send with the request
 
@@ -329,6 +332,14 @@ latest entry it last saw, along with any HTTP caching headers it saw (ETag and
 Last-Modified values).
 
 The default value is to cache.
+
+=item B<-i> I<filename>, B<--input>=I<filename>
+
+The location of a file that contains a newline-separated list of URLs to pull.
+The filename can also be "-", in which case STDIN will be used to read URLs.
+You don't have to pass a URL on the command line if you use this option. If you
+do, those URLs will be appeneded to the list. This functionality is mimicked
+from wget.
 
 =item B<--cache_dir>
 
@@ -380,6 +391,9 @@ say/print-newline dance yourself.
 
 	# print the title, a newline, then tab in, then the link
 	./rss2text.pl -f "__title__\n\t__link__" http://www.schwertly.com/feed/
+
+	# pull updates for all of your blogs with perl in the URL
+	grep -i perl urls.txt | ./rss2text.pl -i -
 
 =head1 AUTHOR
 
