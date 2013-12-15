@@ -13,43 +13,74 @@ binmode(STDOUT, ':encoding(UTF-8)');
 binmode(STDERR, ':encoding(UTF-8)');
 
 # get options passed in
-my ($opts, $url) = get_options();
+my ($opts, $urls) = get_options();
 
-# get everything we know about this url
-my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
-$rss_cache->get_cached_rss();
+process_url($_, $opts) foreach(@$urls);
 
-# get everything the internet knows about this url
-my $feed = get_xml_feed($url, $rss_cache, $opts->{cookie_path});
+sub process_url {
+	my ($url, $opts) = @_;
 
-# say each link if it's new
-foreach my $item ( $feed->get_item() ) {
-	last if ($rss_cache->is_cached_newer($item->pubDate() // $item->get('pubDate')));
+	# get everything we know about this url
+	my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
+	$rss_cache->get_cached_rss();
 
-	(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
-	say $output;
+	# get everything the internet knows about this url
+	my $feed = get_xml_feed($url, $rss_cache, $opts->{cookie_path});
+
+	# say each link if it's new
+	foreach my $item ( $feed->get_item() ) {
+		last if ($rss_cache->is_cached_newer($item->pubDate() // $item->get('pubDate')));
+
+		(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
+		say $output;
+	}
+
+	# update the cache with information about the feed
+	$rss_cache->update_rss_cache($feed);
 }
-
-# update the cache with information about the feed
-$rss_cache->update_rss_cache($feed);
 
 sub get_options {
 	# default settings
 	my %opts = (
-		format    => '__link__',
-		cache     => 1,
-		cache_dir => '/tmp/rss2text/',
+		format      => '__link__',
+		cache       => 1,
+		cache_dir   => '/tmp/rss2text/',
 		cookie_path => undef,
+		input       => undef,
 	);
 
 	GetOptions(\%opts,
 		'format|f:s',
 		'cache|c!',
+		'input|i:s',
 		'cache_dir:s',
 		'cookie_path:s',
 	) or pod2usage(2);
 
-	my $url = shift @ARGV or pod2usage(2);
+	my $urls;
+
+	# be like wget, accept urls through command-line or STDIN
+	my $input = $opts{input};
+	if (defined($input)) {
+		if ($input eq '-') {
+			while (defined(my $line = <STDIN>)) {
+				chomp $line;
+				push @$urls, $line;
+			}
+		} else {
+			unless (-r $input) {
+				say STDERR "$input is not a readable file, bailing";
+				exit;
+			}
+			open my $fh, '<', $input or die "Unable to read $input, bailing. Reason: $!";
+			while (defined(my $line = <$fh>)) {
+				chomp $line;
+				push @$urls, $line;
+			}
+		}
+	}
+	# they can specify a file, and just like wget, we'll still eat the urls on the commandline
+	push @$urls, @ARGV;
 
 	# expand newlines and tabs using cool double eval
 	$opts{format} =~ s/\\([nt])/"qq|\\$1|"/gee;
@@ -63,7 +94,7 @@ sub get_options {
 		exit 1;
 	}
 
-	return (\%opts, $url);
+	return (\%opts, $urls);
 }
 
 sub get_xml_feed {
