@@ -66,6 +66,7 @@ sub get_options {
 		if ($input eq '-') {
 			while (defined(my $line = <STDIN>)) {
 				chomp $line;
+				next unless $_;
 				push @$urls, $line;
 			}
 		} else {
@@ -76,6 +77,7 @@ sub get_options {
 			open my $fh, '<', $input or die "Unable to read $input, bailing. Reason: $!";
 			while (defined(my $line = <$fh>)) {
 				chomp $line;
+				next unless $_;
 				push @$urls, $line;
 			}
 		}
