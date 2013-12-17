@@ -104,7 +104,7 @@ sub get_xml_feed {
 	my ($url, $rss_cache, $cookie_path) = @_;
 	my $ua = LWP::UserAgent->new(
 		agent   => 'rss2text (https://github.com/Stantheman/rss2text)',
-		timeout => 5,
+		timeout => 10,
 	);
 
 	if ($cookie_path) {
