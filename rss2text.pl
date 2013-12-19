@@ -26,10 +26,10 @@ sub process_url {
 
 	# get everything the internet knows about this url
 	my $feed = get_xml_feed($url, $rss_cache, $opts->{cookie_path});
-	return unless $feed;
+	return unless keys(%$feed);
 
 	# say each link if it's new
-	foreach my $item ( $feed->get_item() ) {
+	foreach my $item ( $feed->{feed}->get_item() ) {
 		last if ($rss_cache->is_cached_newer($item->pubDate() // $item->get('pubDate')));
 
 		(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
@@ -141,7 +141,11 @@ sub get_xml_feed {
 		$feed = undef;
 	};
 
-	return $feed;
+	return {
+		feed => $feed,
+		etag => $rss_feed->header('etag') || '',
+		last_modified => $rss_feed->header('last-modified') || '',
+	};
 }
 
 sub parse_token {
@@ -252,7 +256,7 @@ sub update_rss_cache {
 
 	return unless $self->{_cache_on};
 
-	my $item = $feed->get_item(0) or do {
+	my $item = $feed->{feed}->get_item(0) or do {
 		say STDERR "Can't get the first item from the feed ($self->{url}). Not updating the cache";
 		return;
 	};
@@ -276,8 +280,8 @@ sub update_rss_cache {
 	if (DateTime->compare($self->{last_pulled_dt}, $new_dt) == -1) {
 		open my $fh, '>', $self->{_cache_filename} or die "Unable to update the cache file: $!";
 		print $fh $self->{w3c}->format_datetime($new_dt) . "\n";
-		print $fh $self->{etag} . "\n";
-		print $fh $self->{last_modified} . "\n";
+		print $fh $feed->{etag} . "\n";
+		print $fh $feed->{last_modified} . "\n";
 		close $fh;
 	}
 }
