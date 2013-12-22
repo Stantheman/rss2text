@@ -30,7 +30,9 @@ sub process_url {
 
 	# say each link if it's new
 	foreach my $item ( $feed->{feed}->get_item() ) {
-		last if ($rss_cache->is_cached_newer($item->pubDate() // $item->get('pubDate')));
+		last if ($rss_cache->is_cached_newer(
+			$item->pubDate() // $item->get('pubDate') // $feed->{feed}->pubDate())
+		);
 
 		(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
 		say $output;
@@ -261,7 +263,7 @@ sub update_rss_cache {
 		return;
 	};
 
-	my $new_dt = $item->pubDate() || $item->get('pubDate');
+	my $new_dt = $item->pubDate() // $item->get('pubDate') // $feed->{feed}->pubDate();
 
 	unless(defined($new_dt)) {
 		say STDERR "Can't get the published date from the first item in the feed ($self->{url}). Not updating the cache";
