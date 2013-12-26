@@ -27,6 +27,7 @@ sub process_url {
 	# get everything the internet knows about this url
 	my $feed = get_xml_feed($url, $rss_cache, $opts->{cookie_path});
 	return unless keys(%$feed);
+	return unless $feed->{feed}->get_item();
 
 	# say each link if it's new
 	foreach my $item ( $feed->{feed}->get_item() ) {
