@@ -27,6 +27,7 @@ sub process_url {
 	# get everything the internet knows about this url
 	my $feed = get_xml_feed($url, $rss_cache, $opts->{cookie_path});
 	return unless keys(%$feed);
+	return unless defined($feed->{feed});
 	return unless $feed->{feed}->get_item();
 
 	# say each link if it's new
@@ -280,7 +281,7 @@ sub update_rss_cache {
 	return unless $new_dt;
 
 	# if the last_pulled_dt < $new_dt
-	if (DateTime->compare($self->{last_pulled_dt}, $new_dt) == -1) {
+	if ( (DateTime->compare($self->{last_pulled_dt}, $new_dt) == -1) || ($self->{last_modified} ne $feed->{last_modified}) ) {
 		open my $fh, '>', $self->{_cache_filename} or die "Unable to update the cache file: $!";
 		print $fh $self->{w3c}->format_datetime($new_dt) . "\n";
 		print $fh $feed->{etag} . "\n";
