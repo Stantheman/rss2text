@@ -22,6 +22,11 @@ sub process_url {
 
 	# get everything we know about this url
 	my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
+	if ($opts->{debug}) {
+		say $rss_cache->get_cache_filename();
+		return;
+	}
+
 	$rss_cache->get_cached_rss();
 
 	# get everything the internet knows about this url
@@ -52,14 +57,16 @@ sub get_options {
 		cache_dir   => '/tmp/rss2text/',
 		cookie_path => undef,
 		input       => undef,
+		debug       => undef,
 	);
 
 	GetOptions(\%opts,
 		'format|f:s',
 		'cache|c!',
-		'input|i:s',
 		'cache_dir:s',
 		'cookie_path:s',
+		'input|i:s',
+		'debug|d!',
 	) or pod2usage(2);
 
 	my $urls;
@@ -190,6 +197,11 @@ sub new {
 	return bless $self, $class;
 }
 
+sub get_cache_filename {
+	my $self = shift;
+	return $self->{_cache_filename};
+}
+
 sub get_cached_rss {
 	my $self = shift;
 
@@ -311,8 +323,11 @@ Takes a feed and optional format string, and prints for every new entry.
 	  -i, --input           pass a file of URLs to download or "-" for STDIN
 	  --cache_dir           location of the cache directory.
 	  --cookie_path         path to a cookie to send with the request
+	  -d, --debug           print the path to the cache file
 
 =head1 OPTIONS
+
+=over 4
 
 =item B<-f> I<format string>, B<--format>=I<format string>
 
@@ -365,6 +380,13 @@ must be saved in Netscape format (or more usefully: the format that "curl"
 saves cookies in.)
 
 rss2text by default does not send any cookie along with requests.
+
+=item B<-d>, B<--debug>
+
+Debug will take the given URL(s) and print the location of the file on disk
+containing the cached information. This option overrides the others.
+
+=back
 
 =head1 DESCRIPTION
 
