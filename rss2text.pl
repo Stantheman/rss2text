@@ -9,6 +9,7 @@ use Pod::Usage;
 use Try::Tiny;
 use XML::FeedPP;
 use POE qw(Wheel::Run Filter::Reference);
+use Data::Dumper;
 
 binmode(STDOUT, ':encoding(UTF-8)');
 binmode(STDERR, ':encoding(UTF-8)');
@@ -16,7 +17,7 @@ binmode(STDERR, ':encoding(UTF-8)');
 # get options passed in
 my ($opts, $urls) = get_options();
 
-sub MAX_CONCURRENT_TASKS () { 3 }
+sub MAX_CONCURRENT_TASKS () { 10 }
 
 # Start the session that will manage all the children.  The _start and
 # next_task events are handled by the same function.
@@ -45,7 +46,7 @@ sub start_tasks {
     print "Starting task for $next_task...\n";
     my $task = POE::Wheel::Run->new(
       Program      => sub { do_stuff($next_task) },
-      StdoutFilter => POE::Filter::Reference->new(),
+     # StdoutFilter => POE::Filter::Reference->new(),
       StdoutEvent  => "task_result",
       StderrEvent  => "task_debug",
       CloseEvent   => "task_done",
@@ -62,22 +63,7 @@ sub start_tasks {
 # references.
 sub do_stuff {
   my $task   = shift;
-  my $filter = POE::Filter::Reference->new();
-
-  # Simulate a long, blocking task.
-  $filter->put([process_url($task, $opts)]);
-
-  # # Generate a bogus result.  Note that this result will be passed by
-  # # reference back to the parent process via POE::Filter::Reference.
-  # my %result = (
-  #   task   => $task,
-  #   status => "seems ok to me",
-  # );
-
-  # # Generate some output via the filter.  Note the strange use of list
-  # # references.
-  # my $output = $filter->put([\%result]);
-  # print @$output;
+  say $_ for (process_url($task, $opts));
 }
 
 # Handle information returned from the task.  Since we're using
@@ -85,7 +71,8 @@ sub do_stuff {
 # child process.  In this sample, it's a hash reference.
 sub handle_task_result {
   my $result = $_[ARG0];
-  say $_ foreach (@$result);
+  say $result;
+  #say $_ foreach (@$result);
 }
 
 # Catch and display information from the child's STDERR.  This was
@@ -148,7 +135,7 @@ sub process_url {
 
 	# update the cache with information about the feed
 	$rss_cache->update_rss_cache($feed);
-	return \@new_posts;
+	return @new_posts;
 }
 
 sub get_options {
