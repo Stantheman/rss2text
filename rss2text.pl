@@ -9,10 +9,6 @@ use Pod::Usage;
 use Try::Tiny;
 use XML::FeedPP;
 use POE qw(Wheel::Run Filter::Reference);
-use Data::Dumper;
-
-binmode(STDOUT, ':encoding(UTF-8)');
-binmode(STDERR, ':encoding(UTF-8)');
 
 # get options passed in
 my ($opts, $urls) = get_options();
@@ -27,7 +23,8 @@ POE::Session->create(
     next_task   => \&start_tasks,
     task_result => \&handle_task_result,
     task_done   => \&handle_task_done,
-    task_debug  => \&handle_task_debug,
+    task_debug  => sub { say STDERR $_[ARG0] } ,
+    task_output => sub { say $_[ARG0] },
     sig_child   => \&sig_child,
   }
 );
@@ -40,47 +37,20 @@ POE::Session->create(
 # a short anonymous sub so we can pass in parameters.
 sub start_tasks {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
+
   while (keys(%{$heap->{task}}) < MAX_CONCURRENT_TASKS) {
     my $next_task = shift @$urls;
     last unless defined $next_task;
-    print "Starting task for $next_task...\n";
+
     my $task = POE::Wheel::Run->new(
-      Program      => sub { do_stuff($next_task) },
-     # StdoutFilter => POE::Filter::Reference->new(),
-      StdoutEvent  => "task_result",
+      Program      => sub { process_url($next_task, $opts) },
+      StdoutEvent  => "task_output",
       StderrEvent  => "task_debug",
       CloseEvent   => "task_done",
     );
     $heap->{task}->{$task->ID} = $task;
     $kernel->sig_child($task->PID, "sig_child");
   }
-}
-
-# This function is not a POE function!  It is a plain sub that will be
-# run in a forked off child.  It uses POE::Filter::Reference so that
-# it can return arbitrary information.  All POE filters can be used by
-# themselves, but their parameters and return values are always list
-# references.
-sub do_stuff {
-  my $task   = shift;
-  say $_ for (process_url($task, $opts));
-}
-
-# Handle information returned from the task.  Since we're using
-# POE::Filter::Reference, the $result is however it was created in the
-# child process.  In this sample, it's a hash reference.
-sub handle_task_result {
-  my $result = $_[ARG0];
-  say $result;
-  #say $_ foreach (@$result);
-}
-
-# Catch and display information from the child's STDERR.  This was
-# useful for debugging since the child's warnings and errors were not
-# being displayed otherwise.
-sub handle_task_debug {
-  my $result = $_[ARG0];
-  print "Debug: $result\n";
 }
 
 # The task is done.  Delete the child wheel, and try to start a new
@@ -95,18 +65,14 @@ sub handle_task_done {
 sub sig_child {
   my ($heap, $sig, $pid, $exit_val) = @_[HEAP, ARG0, ARG1, ARG2];
   my $details = delete $heap->{$pid};
-
-  # warn "$$: Child $pid exited";
 }
 
 # Run until there are no more tasks.
 $poe_kernel->run();
 exit 0;
-#process_url($_, $opts) foreach(@$urls);
 
 sub process_url {
 	my ($url, $opts) = @_;
-	my @new_posts;
 
 	# get everything we know about this url
 	my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
@@ -130,12 +96,11 @@ sub process_url {
 		);
 
 		(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
-		push @new_posts, $output;
+		say $output;
 	}
 
 	# update the cache with information about the feed
 	$rss_cache->update_rss_cache($feed);
-	return @new_posts;
 }
 
 sub get_options {
