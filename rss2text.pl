@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 use strict;
 use warnings;
 use 5.10.0;
@@ -8,6 +8,7 @@ use LWP::UserAgent;
 use Pod::Usage;
 use Try::Tiny;
 use XML::FeedPP;
+use POE qw(Wheel::Run Filter::Reference);
 
 binmode(STDOUT, ':encoding(UTF-8)');
 binmode(STDERR, ':encoding(UTF-8)');
@@ -15,10 +16,110 @@ binmode(STDERR, ':encoding(UTF-8)');
 # get options passed in
 my ($opts, $urls) = get_options();
 
-process_url($_, $opts) foreach(@$urls);
+sub MAX_CONCURRENT_TASKS () { 3 }
+
+# Start the session that will manage all the children.  The _start and
+# next_task events are handled by the same function.
+POE::Session->create(
+  inline_states => {
+    _start      => \&start_tasks,
+    next_task   => \&start_tasks,
+    task_result => \&handle_task_result,
+    task_done   => \&handle_task_done,
+    task_debug  => \&handle_task_debug,
+    sig_child   => \&sig_child,
+  }
+);
+
+# Start as many tasks as needed so that the number of tasks is no more
+# than MAX_CONCURRENT_TASKS.  Every wheel event is accompanied by the
+# wheel's ID.  This function saves each wheel by its ID so it can be
+# referred to when its events are handled.
+# Wheel::Run's Program may be a code reference.  Here it's called via
+# a short anonymous sub so we can pass in parameters.
+sub start_tasks {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  while (keys(%{$heap->{task}}) < MAX_CONCURRENT_TASKS) {
+    my $next_task = shift @$urls;
+    last unless defined $next_task;
+    print "Starting task for $next_task...\n";
+    my $task = POE::Wheel::Run->new(
+      Program      => sub { do_stuff($next_task) },
+      StdoutFilter => POE::Filter::Reference->new(),
+      StdoutEvent  => "task_result",
+      StderrEvent  => "task_debug",
+      CloseEvent   => "task_done",
+    );
+    $heap->{task}->{$task->ID} = $task;
+    $kernel->sig_child($task->PID, "sig_child");
+  }
+}
+
+# This function is not a POE function!  It is a plain sub that will be
+# run in a forked off child.  It uses POE::Filter::Reference so that
+# it can return arbitrary information.  All POE filters can be used by
+# themselves, but their parameters and return values are always list
+# references.
+sub do_stuff {
+  my $task   = shift;
+  my $filter = POE::Filter::Reference->new();
+
+  # Simulate a long, blocking task.
+  $filter->put([process_url($task, $opts)]);
+
+  # # Generate a bogus result.  Note that this result will be passed by
+  # # reference back to the parent process via POE::Filter::Reference.
+  # my %result = (
+  #   task   => $task,
+  #   status => "seems ok to me",
+  # );
+
+  # # Generate some output via the filter.  Note the strange use of list
+  # # references.
+  # my $output = $filter->put([\%result]);
+  # print @$output;
+}
+
+# Handle information returned from the task.  Since we're using
+# POE::Filter::Reference, the $result is however it was created in the
+# child process.  In this sample, it's a hash reference.
+sub handle_task_result {
+  my $result = $_[ARG0];
+  say $_ foreach (@$result);
+}
+
+# Catch and display information from the child's STDERR.  This was
+# useful for debugging since the child's warnings and errors were not
+# being displayed otherwise.
+sub handle_task_debug {
+  my $result = $_[ARG0];
+  print "Debug: $result\n";
+}
+
+# The task is done.  Delete the child wheel, and try to start a new
+# task to take its place.
+sub handle_task_done {
+  my ($kernel, $heap, $task_id) = @_[KERNEL, HEAP, ARG0];
+  delete $heap->{task}->{$task_id};
+  $kernel->yield("next_task");
+}
+
+# Detect the CHLD signal as each of our children exits.
+sub sig_child {
+  my ($heap, $sig, $pid, $exit_val) = @_[HEAP, ARG0, ARG1, ARG2];
+  my $details = delete $heap->{$pid};
+
+  # warn "$$: Child $pid exited";
+}
+
+# Run until there are no more tasks.
+$poe_kernel->run();
+exit 0;
+#process_url($_, $opts) foreach(@$urls);
 
 sub process_url {
 	my ($url, $opts) = @_;
+	my @new_posts;
 
 	# get everything we know about this url
 	my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
@@ -42,11 +143,12 @@ sub process_url {
 		);
 
 		(my $output = $opts->{format}) =~ s/__([^\s]*?)__/parse_token($item, $1)/ge;
-		say $output;
+		push @new_posts, $output;
 	}
 
 	# update the cache with information about the feed
 	$rss_cache->update_rss_cache($feed);
+	return \@new_posts;
 }
 
 sub get_options {
