@@ -96,9 +96,11 @@ for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
 make sure DateTime::Format::W3CDTF doesn't kill the program. It will make
 use of HTTP::Cookies::Netscape if you ask it to send a cookie with a request.
 
+rss2text uses POE to grab feeds more quickly.
+
 Debian has packages available for each:
 
-        apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl libhttp-cookies-perl
+        apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl libhttp-cookies-perl libpoe-perl
 
 rss2text uses perl 5.10.0. Older perls can be used, but you'll have to do the
 say/print-newline dance yourself.
