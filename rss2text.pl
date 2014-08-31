@@ -10,18 +10,16 @@ use Try::Tiny;
 use XML::FeedPP;
 use POE qw(Wheel::Run Filter::Reference);
 
-# get options passed in
-my ($opts, $urls) = get_options();
-
 sub MAX_CONCURRENT_TASKS () { 10 }
 
-# Start the session that will manage all the children.  The _start and
-# next_task events are handled by the same function.
+# get options passed in and get a ref to the URLs we're grabbing
+my ($opts, $urls) = get_options();
+
+# liberally applied from http://poe.perl.org/?POE_Cookbook/Child_Processes_3
 POE::Session->create(
   inline_states => {
     _start      => \&start_tasks,
     next_task   => \&start_tasks,
-    task_result => \&handle_task_result,
     task_done   => \&handle_task_done,
     task_debug  => sub { say STDERR $_[ARG0] } ,
     task_output => sub { say $_[ARG0] },
@@ -73,6 +71,8 @@ exit 0;
 
 sub process_url {
 	my ($url, $opts) = @_;
+	binmode(STDOUT, ':encoding(UTF-8)');
+	binmode(STDERR, ':encoding(UTF-8)');
 
 	# get everything we know about this url
 	my $rss_cache = rss2text::cache->new($url, $opts->{cache}, $opts->{cache_dir});
