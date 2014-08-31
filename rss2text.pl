@@ -10,8 +10,6 @@ use Try::Tiny;
 use XML::FeedPP;
 use POE qw(Wheel::Run Filter::Reference);
 
-sub MAX_CONCURRENT_TASKS () { 10 }
-
 # get options passed in and get a ref to the URLs we're grabbing
 my ($opts, $urls) = get_options();
 
@@ -28,15 +26,13 @@ POE::Session->create(
 );
 
 # Start as many tasks as needed so that the number of tasks is no more
-# than MAX_CONCURRENT_TASKS.  Every wheel event is accompanied by the
-# wheel's ID.  This function saves each wheel by its ID so it can be
+# than the limit. Every wheel event is accompanied by the
+# wheel's ID. This function saves each wheel by its ID so it can be
 # referred to when its events are handled.
-# Wheel::Run's Program may be a code reference.  Here it's called via
-# a short anonymous sub so we can pass in parameters.
 sub start_tasks {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-  while (keys(%{$heap->{task}}) < MAX_CONCURRENT_TASKS) {
+  while (keys(%{$heap->{task}}) < $opts->{workers}) {
     my $next_task = shift @$urls;
     last unless defined $next_task;
 
@@ -112,6 +108,7 @@ sub get_options {
 		cookie_path => undef,
 		input       => undef,
 		debug       => undef,
+		workers     => 10,
 	);
 
 	GetOptions(\%opts,
@@ -121,6 +118,7 @@ sub get_options {
 		'cookie_path:s',
 		'input|i:s',
 		'debug|d!',
+		'workers|w:i',
 	) or pod2usage(2);
 
 	my $urls;
@@ -378,6 +376,7 @@ Takes a feed and optional format string, and prints for every new entry.
 	  --cache_dir           location of the cache directory.
 	  --cookie_path         path to a cookie to send with the request
 	  -d, --debug           print the path to the cache file
+	  -w, --workers         change number of workers
 
 =head1 OPTIONS
 
@@ -440,6 +439,10 @@ rss2text by default does not send any cookie along with requests.
 Debug will take the given URL(s) and print the location of the file on disk
 containing the cached information. This option overrides the others.
 
+=item B<-w>, B<--workers>
+
+Change the number of workers used to grab URLs. Defaults to 10.
+
 =back
 
 =head1 DESCRIPTION
@@ -460,9 +463,11 @@ for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
 make sure DateTime::Format::W3CDTF doesn't kill the program. It will make
 use of HTTP::Cookies::Netscape if you ask it to send a cookie with a request.
 
+rss2text uses POE to help grab feeds more quickly.
+
 Debian has packages available for each:
 
-	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl libhttp-cookies-perl
+	apt-get install libwww-perl libxml-feedpp-perl libdatetime-format-w3cdtf-perl libtry-tiny-perl libhttp-cookies-perl libpoe-perl
 
 rss2text uses perl 5.10.0. Older perls can be used, but you'll have to do the
 say/print-newline dance yourself.
