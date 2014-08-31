@@ -18,6 +18,7 @@ Takes a feed and optional format string, and prints for every new entry.
           --cache_dir           location of the cache directory.
           --cookie_path         path to a cookie to send with the request
           -d, --debug           print the path to the cache file
+          -w, --workers         change number of workers
 
 # OPTIONS
 
@@ -78,6 +79,10 @@ Takes a feed and optional format string, and prints for every new entry.
     Debug will take the given URL(s) and print the location of the file on disk
     containing the cached information. This option overrides the others.
 
+- **-w**, **--workers**
+
+    Change the number of workers used to grab URLs. Defaults to 10.
+
 # DESCRIPTION
 
 rss2text takes a feed and an optional format string, grabs the feed and loops
@@ -96,7 +101,7 @@ for parsing feeds, DateTime::Format::W3CDTF to parse dates, and Try::Tiny to
 make sure DateTime::Format::W3CDTF doesn't kill the program. It will make
 use of HTTP::Cookies::Netscape if you ask it to send a cookie with a request.
 
-rss2text uses POE to grab feeds more quickly.
+rss2text uses POE to help grab feeds more quickly.
 
 Debian has packages available for each:
 
